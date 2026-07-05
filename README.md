@@ -71,6 +71,8 @@ make serve
 # Visit http://localhost:8080 in your browser
 ```
 
+`make serve` builds the WebAssembly binary first (it depends on the `wasm` target) and then hosts `web/` at `:8080` using a small Go static file server (`tools/serve.go`), so no Python or other external tools are required.
+
 #### URL Parameters
 
 Control the simulation via query strings (same semantics as Mizu-ts):
@@ -136,6 +138,9 @@ cmd/mizu/
 └── params_default.go - Flag-based parameter handling (desktop)
 
 cmd/bench/           - Benchmark tool CLI (see "Benchmark Tool" above)
+
+tools/
+└── serve.go         - Dev-only static file server for `make serve` (go run only, build-ignored)
 
 internal/
 ├── core/            - Foundational types (Particle interface, Random, Bounds)

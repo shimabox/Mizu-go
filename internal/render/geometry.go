@@ -37,6 +37,27 @@ func CenterOffset(spriteW, spriteH, scale, x, y, dx, dy float64) (tx, ty float64
 	return tx, ty
 }
 
+// DeviceUniformScale は UniformScale の HiDPI 対応版である。targetSize
+// (粒子の実際の直径。core.Particle.Radius()*2、CSS px 単位)に dsf
+// (ebiten.Monitor().DeviceScaleFactor())を掛けてから UniformScale に
+// 委譲する。spriteSize はスプライト自身の実ピクセル寸法であり、これは
+// すでに spriteSupersample 倍でラスタライズ済みなので dsf を掛ける必要
+// はない。dsf=1 のときは UniformScale(targetSize, spriteSize) を直接
+// 呼んだ場合とまったく同じ値になる(HiDPI 非対応環境・cmd/bench の
+// Xvfb 環境での回帰を防ぐ)。
+func DeviceUniformScale(targetSize, spriteSize, dsf float64) float64 {
+	return UniformScale(targetSize*dsf, spriteSize)
+}
+
+// DeviceCenterOffset は CenterOffset の HiDPI 対応版である。x, y(粒子
+// 中心)と dx, dy(拡大縮小前の生スクリーンオフセット。例えば
+// shadowOffset)はいずれも CSS px 単位で渡し、dsf を掛けて実デバイス
+// ピクセルに変換したうえで CenterOffset に委譲する。dsf=1 のときは
+// CenterOffset をそのまま呼んだ場合とまったく同じ値になる。
+func DeviceCenterOffset(spriteW, spriteH, scale, x, y, dx, dy, dsf float64) (tx, ty float64) {
+	return CenterOffset(spriteW, spriteH, scale, x*dsf, y*dsf, dx*dsf, dy*dsf)
+}
+
 // H2Layout は、H2 スプライトを合成する際に "H" 本体と "2" の
 // subscript のグリフをどこに配置するか、および両方を収めつつ粒子中心
 // の原点をキャンバスの幾何学的中心にちょうど一致させるために必要な
@@ -59,16 +80,29 @@ const (
 // "2" の subscript(subW x subH、subscript フォントサイズ)を合成
 // するためのレイアウトを計算し、Mizu-ts の
 // SubscriptTextRenderer.ts:31-34 の相対オフセットを再現する: 本体は
-// x-bodyWidth/6 の位置に(y はそのまま)、subscript は x+12, y+3 の
-// 位置に、いずれも自身の位置を中心として center/middle 揃えで描画
-// される。
-func NewH2Layout(bodyW, bodyH, subW, subH float64) H2Layout {
+// x-bodyWidth/6 の位置に(y はそのまま)、subscript は
+// x+h2SubOffsetX*subOffsetScale, y+h2SubOffsetY*subOffsetScale の位置に、
+// いずれも自身の位置を中心として center/middle 揃えで描画される。
+//
+// subOffsetScale は、bodyW/bodyH/subW/subH がどの供給倍率で計測された
+// かに合わせる係数である。h2SubOffsetX/Y (12, 3) は「基準フォント
+// サイズ(scale 1)」の座標系での定数なので、sprites.go がスーパー
+// サンプリング(spriteSupersample)のため supersample 倍のフォント
+// サイズで計測した bodyW 等を渡す場合は、subOffsetScale にも同じ
+// spriteSupersample を渡さなければならない。そうしないと、供給倍率が
+// 上がるほど subscript が本体に対して相対的にどんどん近づいてしまう
+// (このレイアウトは合成した時点の比率がそのまま GeoM で一律縮小
+// されるだけなので、比率の破綻は縮小後もそのまま残る)。dsf/供給倍率を
+// 掛けない従来どおりの挙動が欲しい場合は 1 を渡す。
+func NewH2Layout(bodyW, bodyH, subW, subH, subOffsetScale float64) H2Layout {
 	bodyOffsetX := -bodyW / 6.0
+	subOffsetX := h2SubOffsetX * subOffsetScale
+	subOffsetY := h2SubOffsetY * subOffsetScale
 
-	left := math.Min(bodyOffsetX-bodyW/2, h2SubOffsetX-subW/2)
-	right := math.Max(bodyOffsetX+bodyW/2, h2SubOffsetX+subW/2)
-	top := math.Min(0-bodyH/2, h2SubOffsetY-subH/2)
-	bottom := math.Max(0+bodyH/2, h2SubOffsetY+subH/2)
+	left := math.Min(bodyOffsetX-bodyW/2, subOffsetX-subW/2)
+	right := math.Max(bodyOffsetX+bodyW/2, subOffsetX+subW/2)
+	top := math.Min(0-bodyH/2, subOffsetY-subH/2)
+	bottom := math.Max(0+bodyH/2, subOffsetY+subH/2)
 
 	// halfW/halfH は、キャンバスが原点を中心に対称であり続ける(つまり
 	// 原点がキャンバスの幾何学的中心にちょうど一致する)よう、原点から
@@ -91,7 +125,7 @@ func NewH2Layout(bodyW, bodyH, subW, subH float64) H2Layout {
 		CanvasH: canvasH,
 		BodyX:   cx + bodyOffsetX,
 		BodyY:   cy,
-		SubX:    cx + h2SubOffsetX,
-		SubY:    cy + h2SubOffsetY,
+		SubX:    cx + subOffsetX,
+		SubY:    cy + subOffsetY,
 	}
 }

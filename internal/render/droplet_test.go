@@ -111,6 +111,35 @@ func TestNewDropletImage_CenterPixelOpaqueEnough(t *testing.T) {
 	}
 }
 
+// maxH2oDiameterCSS と maxExpectedDeviceScaleFactor は、
+// DropletBaseDiameter(sprites.go)が本当に「常に縮小のみで済む」大きさ
+// になっているかどうかを検証するための、既知の worst case を表す定数
+// である。
+//
+//   - maxH2oDiameterCSS = (10 + 18) * 1.2 = 33.6 は
+//     internal/particle/factory.go の CreateH2o/scale() が生成しうる
+//     直径の実際の最大値(CSS px)。
+//   - maxExpectedDeviceScaleFactor = 3 は、高密度 Retina 相当の
+//     DeviceScaleFactor として本パッケージが想定する上限
+//     (porting-plan §5.3 の HiDPI 対応、game.go の dsf を参照)。
+const (
+	maxH2oDiameterCSS            = 33.6
+	maxExpectedDeviceScaleFactor = 3.0
+)
+
+func TestDropletBaseDiameter_CoversWorstCaseDevicePixelSize(t *testing.T) {
+	// DropletBaseDiameter は常に「スプライトの実ピクセル寸法 >= 実際に
+	// 描画される直径(device px)」を満たさなければならない。これが
+	// 崩れると GeoM のスケールが 1 を超え、ぼやけ・ジャギーが再発する。
+	worstCaseDevicePixels := maxH2oDiameterCSS * maxExpectedDeviceScaleFactor
+	if float64(DropletBaseDiameter) < worstCaseDevicePixels {
+		t.Errorf(
+			"DropletBaseDiameter = %v, want >= %v (= maxH2oDiameterCSS(%v) * maxExpectedDeviceScaleFactor(%v)) to avoid upscaling",
+			DropletBaseDiameter, worstCaseDevicePixels, maxH2oDiameterCSS, maxExpectedDeviceScaleFactor,
+		)
+	}
+}
+
 func TestNewDropletImage_CornersAreTransparent(t *testing.T) {
 	img := newDropletImage(64)
 	b := img.Bounds()

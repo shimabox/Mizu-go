@@ -138,3 +138,7 @@ internal/
   - Tests on Ubuntu with Go 1.24 and Ebitengine dependencies
   - Runs `go build`, `go vet`, and `go test ./...`
 - **Deploy**: Automatically builds and deploys WebAssembly to GitHub Pages on pushes to `main` (see `.github/workflows/deploy.yml`)
+
+## License
+
+[MIT](./LICENSE)

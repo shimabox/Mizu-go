@@ -91,6 +91,28 @@ Control the simulation via query strings (same semantics as Mizu-ts):
 
 Push to the `main` branch to automatically deploy the WebAssembly demo to GitHub Pages. The deployment workflow is configured in `.github/workflows/deploy.yml`.
 
+### Benchmark Tool
+
+`make bench` (or `go run ./cmd/bench`) automates the manual load-testing protocol above: it opens a real Ebitengine window per scenario, measures wall-clock frame intervals and `Simulator.Update()` time, and writes a Markdown report to `bench-reports/`. Pass `-compare <git-ref>` to A/B compare the current working tree against another ref (checked out into a temporary `git worktree`).
+
+Requires a real, focused GUI environment — `ebiten.RunGame` opens an actual OS window, so this does not work over SSH or on displayless CI machines.
+
+```sh
+make bench
+go run ./cmd/bench -compare main
+go run ./cmd/bench -scenarios default,500 -frames 60 -warmup 1000
+```
+
+| option | default | description |
+|:---|:---|:---|
+| `-compare <git-ref>` | (none) | A/B compare against the given ref, measured in the same session |
+| `-scenarios <a,b,c>` | `default,500,1000` | Scenarios to run (choices: `default`, `500`, `1000`, `3000`) |
+| `-frames <N>` | `300` (`60` for the `3000` scenario) | Number of frames to sample per scenario |
+| `-warmup <ms>` | `3000` | Warmup time before sampling starts |
+| `-out <path>` | `bench-reports/report-<YYYYMMDD-HHmmss>.md` | Report output path |
+
+`ebiten.RunGame` can only be called once per process, so `cmd/bench` re-executes itself as a subprocess per scenario (`-run-one <scenario> -json <path>`, an internal mode) and aggregates the JSON results into the final report.
+
 ## Testing
 
 Run the full test suite:
@@ -113,6 +135,8 @@ cmd/mizu/
 ├── params_js.go     - URL parameter parsing (WebAssembly only)
 └── params_default.go - Flag-based parameter handling (desktop)
 
+cmd/bench/           - Benchmark tool CLI (see "Benchmark Tool" above)
+
 internal/
 ├── core/            - Foundational types (Particle interface, Random, Bounds)
 ├── behavior/        - Behavior simulation
@@ -121,7 +145,8 @@ internal/
 ├── particle/        - Particle factory and particle types (H, H2, O, H2o)
 ├── sim/             - Simulator engine and world state management
 ├── render/          - Rendering logic and sprite management
-└── debug/           - Debugging utilities
+├── debug/           - Debugging utilities
+└── bench/           - Ebiten-independent stats/report generation for cmd/bench
 ```
 
 ### Key Design Decisions

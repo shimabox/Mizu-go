@@ -2,3 +2,8 @@
 *.wasm
 web/wasm_exec.js
 .DS_Store
+
+# ベンチマークレポートは実行環境依存の生成物なのでコミットしない
+# (bench-reports/ ディレクトリ自体は .gitkeep で維持する)。
+/bench-reports/*
+!/bench-reports/.gitkeep

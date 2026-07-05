@@ -29,10 +29,6 @@ func main() {
 	hFlag := flag.Int("h", 30, "initial H atom count (before particle-count scaling)")
 	oFlag := flag.Int("o", 50, "initial O atom count (before particle-count scaling)")
 	measureFlag := flag.Bool("m", false, "enable the measurement overlay (FPS/frame time/particle counts)")
-	// TODO(Phase 6a): measureFlag を統計オーバーレイに配線する
-	// (porting-plan §5.6)。現時点ではオーバーレイ本体の実装に先立って、
-	// フラグとその受け渡し経路だけを用意するため、パースした上で
-	// render.NewGame まで渡してある。
 	flag.Parse()
 
 	// 1. 共有境界。behavior/factory/simulator から読み取られ、
@@ -85,9 +81,10 @@ func main() {
 	simulator.Init(int(float64(*hFlag)*scale), int(float64(*oFlag)*scale))
 
 	// 8. スプライトを RunGame の開始前に一度だけ生成し(porting-plan
-	// §5.2)、続いて Game とウィンドウを用意する。
+	// §5.2)、続いて Game とウィンドウを用意する。faces は -m の計測
+	// オーバーレイのテキストにも再利用される(porting-plan §5.6)。
 	sprites := render.NewSprites(faces)
-	game := render.NewGame(simulator, sprites, *measureFlag)
+	game := render.NewGame(simulator, sprites, faces, *measureFlag)
 
 	ebiten.SetWindowTitle("Mizu-go")
 	ebiten.SetWindowSize(initialWindowWidth, initialWindowHeight)

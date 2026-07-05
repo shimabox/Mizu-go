@@ -17,9 +17,12 @@ import (
 	"github.com/shimabox/Mizu-go/internal/sim"
 )
 
-// initialWindowWidth と initialWindowHeight は起動時のウィンドウ
-// サイズであり、その後ウィンドウはリサイズ可能である(porting-plan
-// §5.4)。
+// initialWindowWidth と initialWindowHeight は、デスクトップにおける
+// 起動時のウィンドウサイズであり、その後ウィンドウはリサイズ可能で
+// ある(porting-plan §5.4)。js ではウィンドウサイズは実ブラウザの
+// window.innerWidth/innerHeight から取得され(initialWindowSize を
+// 参照)、この定数は取得値が異常なときのフォールバックとしてのみ
+// 使われる。
 const (
 	initialWindowWidth  = 1280
 	initialWindowHeight = 720
@@ -39,7 +42,17 @@ func main() {
 
 	// 1. 共有境界。behavior/factory/simulator から読み取られ、
 	// リサイズ時に更新される(porting-plan §5.4)。
-	bounds := core.NewBounds(initialWindowWidth, initialWindowHeight)
+	//
+	// 重要: 初期粒子の生成(手順 7 の Init)は RunGame(最初の Layout)
+	// より前に行われるため、bounds は最初から実ウィンドウサイズで
+	// 初期化しなければならない。定数で初期化すると、js(ブラウザ)では
+	// 実際の画面が幅 768px 未満(スマホ等)のときに粒子のサイズスケール
+	// と個数スケールが誤り、初期粒子だけが大きい・多い状態になる。
+	// initialWindowSize は js では window.innerWidth/innerHeight を、
+	// 非 js では従来どおり initialWindowWidth/initialWindowHeight を
+	// 返す(params_js.go / params_default.go を参照)。
+	initialW, initialH := initialWindowSize()
+	bounds := core.NewBounds(initialW, initialH)
 
 	// 2. 乱数。
 	random := core.NewRandom()

@@ -37,3 +37,27 @@ func applyURLParams(h, o *int, m *bool) {
 		*m = true
 	}
 }
+
+// initialWindowSize は js ビルドでは window.innerWidth/innerHeight
+// (CSS ピクセル。Ebitengine が Layout に渡す device-independent pixels
+// と同じ単位)を返す。
+//
+// 初期粒子の生成(Simulator.Init)は RunGame(最初の Layout)より前に
+// 行われるため、js ではここで実ウィンドウサイズを使って bounds を初期化
+// しないと、スマホなど幅 768px 未満の画面で粒子のサイズスケール
+// (1.2 扱い)と個数スケール(1.5 扱い)が誤り、最初の Layout 以降に
+// 生成される粒子とサイズの異なる初期粒子が混在してしまう(Mizu-ts は
+// 起動時に実ウィンドウサイズでキャンバスを作ってから粒子を生成するため、
+// この問題が存在しない)。
+//
+// 取得値が 0 以下などの異常値の場合は、デスクトップと同じ
+// initialWindowWidth/initialWindowHeight にフォールバックする。
+func initialWindowSize() (w, h float64) {
+	window := js.Global().Get("window")
+	w = window.Get("innerWidth").Float()
+	h = window.Get("innerHeight").Float()
+	if w <= 0 || h <= 0 {
+		return initialWindowWidth, initialWindowHeight
+	}
+	return w, h
+}

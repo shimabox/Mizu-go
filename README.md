@@ -5,6 +5,10 @@ Mizu-go is a joke script that simulates water(H2o) generation in Go.
 > [!NOTE]
 > A Go + [Ebitengine](https://ebitengine.org/) port of [Mizu-ts](https://github.com/shimabox/Mizu-ts) (TypeScript), which itself is a port of [Mizu](https://github.com/shimabox/Mizu), originally written in JavaScript.
 
+## Demo
+
+https://shimabox.github.io/Mizu-go/
+
 ## Features
 
 - **Cross-platform**: Desktop (macOS, Linux, Windows) + WebAssembly support

@@ -145,6 +145,8 @@ cmd/mizu/
 
 cmd/bench/           - Benchmark tool CLI (see "Benchmark Tool" above)
 
+cmd/devshot/         - Dev-only visual verification tool (see "Visual Verification" below)
+
 tools/
 └── serve.go         - Dev-only static file server for `make serve` (go run only, build-ignored)
 
@@ -159,6 +161,26 @@ internal/
 ├── debug/           - Debugging utilities
 └── bench/           - Ebiten-independent stats/report generation for cmd/bench
 ```
+
+### Visual Verification (devshot)
+
+Ebitengine has no headless mode, so `cmd/devshot` is the tool for capturing what the game actually renders: it runs the same wiring as `cmd/mizu`, draws every frame to an offscreen image, dumps a PNG at the given tick, and exits. Useful for before/after comparisons of rendering changes (see [#1](https://github.com/shimabox/Mizu-go/pull/1)) and for checking overlay numbers under load — no screen-recording permission required.
+
+```sh
+go run ./cmd/devshot -out shot.png                  # default scene, captured after 300 ticks (~5s)
+go run ./cmd/devshot -out shot.png -m -h 500 -o 500 # load test with the stats overlay
+go run ./cmd/devshot -out shot.png -ticks 900       # capture a later moment (~15s)
+```
+
+| Flag | Default | Description |
+|:---|:---|:---|
+| `-out` | `devshot.png` | Output PNG path |
+| `-h` / `-o` | 30 / 50 | Initial particle counts (before count scaling) |
+| `-m` | false | Draw the measurement overlay into the capture |
+| `-ticks` | 300 | Tick at which the frame is captured (60 ticks ≈ 1s) |
+| `-width` / `-height` | 1280 / 720 | Logical resolution (CSS px) |
+
+Like `make bench`, it opens a real window, so it does not work over SSH or on displayless CI machines.
 
 ### Key Design Decisions
 

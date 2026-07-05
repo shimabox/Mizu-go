@@ -75,7 +75,7 @@ func TestNewH2Layout_OriginIsCanvasCenter(t *testing.T) {
 	// ていてもその規約を共有できるよう、論理上の原点(TS の
 	// fillText(text, x, y) が呼ばれる位置に相当)をキャンバスの幾何学
 	// 的中心にちょうど一致させなければならない。
-	layout := NewH2Layout(16, 20, 10, 12)
+	layout := NewH2Layout(16, 20, 10, 12, 1)
 
 	cx := layout.CanvasW / 2
 	cy := layout.CanvasH / 2
@@ -98,7 +98,7 @@ func TestNewH2Layout_OriginIsCanvasCenter(t *testing.T) {
 func TestNewH2Layout_CanvasContainsBothGlyphs(t *testing.T) {
 	bodyW, bodyH := 16.0, 20.0
 	subW, subH := 10.0, 12.0
-	layout := NewH2Layout(bodyW, bodyH, subW, subH)
+	layout := NewH2Layout(bodyW, bodyH, subW, subH, 1)
 
 	checks := []struct {
 		name         string
@@ -118,7 +118,7 @@ func TestNewH2Layout_CanvasContainsBothGlyphs(t *testing.T) {
 }
 
 func TestNewH2Layout_CanvasIsSymmetricAroundOrigin(t *testing.T) {
-	layout := NewH2Layout(16, 20, 10, 12)
+	layout := NewH2Layout(16, 20, 10, 12, 1)
 	if math.Abs(layout.CanvasW/2-layout.CanvasW/2) > 1e-9 {
 		t.Fatalf("sanity check failed")
 	}
@@ -130,5 +130,72 @@ func TestNewH2Layout_CanvasIsSymmetricAroundOrigin(t *testing.T) {
 	}
 	if layout.CanvasH/2*2 != layout.CanvasH {
 		t.Errorf("CanvasH = %v is not evenly divisible by 2", layout.CanvasH)
+	}
+}
+
+func TestNewH2Layout_SubOffsetScalesWithSubOffsetScale(t *testing.T) {
+	// newH2Sprite はスーパーサンプリング(spriteSupersample、sprites.go)
+	// のため body/subscript のグリフを供給倍率倍のフォントサイズで計測
+	// する。h2SubOffsetX/Y (12, 3) は「基準フォントサイズ(scale 1)」の
+	// 座標系での定数なので、subOffsetScale で同じ倍率にスケールしないと、
+	// 供給倍率が上がるほど subscript が本体に対して相対的にどんどん
+	// 近づいてしまう(合成後に GeoM で一律縮小するだけなので、比率は
+	// 常にこの合成時点で決まる)。
+	const subOffsetScale = 4.0
+	layout := NewH2Layout(16, 20, 10, 12, subOffsetScale)
+
+	cx := layout.CanvasW / 2
+	cy := layout.CanvasH / 2
+
+	if want := cx + 12*subOffsetScale; layout.SubX != want {
+		t.Errorf("SubX = %v, want %v (cx + h2SubOffsetX*subOffsetScale)", layout.SubX, want)
+	}
+	if want := cy + 3*subOffsetScale; layout.SubY != want {
+		t.Errorf("SubY = %v, want %v (cy + h2SubOffsetY*subOffsetScale)", layout.SubY, want)
+	}
+}
+
+// これらのテストは、CenterOffset/UniformScale の HiDPI 対応版
+// (DeviceCenterOffset/DeviceUniformScale、いずれも internal/render/
+// game.go の drawGlyphs/drawDroplets から呼ばれる)をカバーする。
+// dsf=1 のときは既存の CenterOffset/UniformScale をそのまま呼んだ場合と
+// 厳密に同じ結果にならなければならない(HiDPI 非対応環境・cmd/bench の
+// Xvfb 環境ではこれまでと完全に同じ描画結果になることを保証するため)。
+
+func TestDeviceUniformScale_DSF1MatchesUniformScale(t *testing.T) {
+	got := DeviceUniformScale(24, 96, 1)
+	want := UniformScale(24, 96)
+	if got != want {
+		t.Errorf("DeviceUniformScale(24, 96, 1) = %v, want %v (== UniformScale(24, 96))", got, want)
+	}
+}
+
+func TestDeviceUniformScale_DSF2DoublesEffectiveTargetSize(t *testing.T) {
+	// dsf=2 の実デバイスピクセル数は CSS px の 2 倍なので、同じ
+	// targetSize(CSS px)でも実際に掛けるべき倍率は 2 倍になる。
+	got := DeviceUniformScale(24, 96, 2)
+	want := UniformScale(24*2, 96)
+	if got != want {
+		t.Errorf("DeviceUniformScale(24, 96, 2) = %v, want %v", got, want)
+	}
+}
+
+func TestDeviceCenterOffset_DSF1MatchesCenterOffset(t *testing.T) {
+	gotTx, gotTy := DeviceCenterOffset(10, 10, 2, 100, 50, 1, 1, 1)
+	wantTx, wantTy := CenterOffset(10, 10, 2, 100, 50, 1, 1)
+	if gotTx != wantTx || gotTy != wantTy {
+		t.Errorf("DeviceCenterOffset(...,1) = (%v,%v), want (%v,%v) (== CenterOffset)", gotTx, gotTy, wantTx, wantTy)
+	}
+}
+
+func TestDeviceCenterOffset_DSF2ScalesPositionAndShadowOffset(t *testing.T) {
+	// x, y, dx, dy はいずれも CSS px 単位で渡され、dsf を掛けてから
+	// CenterOffset に渡らなければならない(粒子位置も影オフセットも
+	// 実デバイスピクセルで描く必要があるため)。
+	const dsf = 2.0
+	gotTx, gotTy := DeviceCenterOffset(10, 10, 2, 100, 50, 1, 1, dsf)
+	wantTx, wantTy := CenterOffset(10, 10, 2, 100*dsf, 50*dsf, 1*dsf, 1*dsf)
+	if gotTx != wantTx || gotTy != wantTy {
+		t.Errorf("DeviceCenterOffset(...,2) = (%v,%v), want (%v,%v)", gotTx, gotTy, wantTx, wantTy)
 	}
 }

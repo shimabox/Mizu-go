@@ -8,12 +8,30 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
+// spriteSupersample は、H/O/H2 のテキストスプライトを実際の想定描画
+// サイズより何倍大きい解像度でラスタライズしておくかを表す供給倍率
+// である(Ebitengine 公式 examples/highdpi と同じ定石: スプライトは
+// 常に「縮小方向」にのみ拡大縮小し、拡大は絶対に発生させない)。
+//
+// 本体フォントの実際の最大サイズは BaseFontSize * 1.2 = 28.8 CSS px
+// (internal/particle/factory.go の scale()、幅 768px 以上の画面)。
+// DeviceScaleFactor が最大 3(高密度 Retina 相当)になっても
+// 28.8 * 3 = 86.4 device px までは常に縮小のみで済むよう、
+// BaseFontSize(24) の 4 倍 = 96px でラスタライズする。
+const spriteSupersample = 4.0
+
 // DropletBaseDiameter は、H2o の水滴スプライトを生成する際のピクセル
 // 直径である(porting-plan §5.2 に従い、画面上のどの水滴よりも大きい
 // サイズにすることで、常に縮小のみで済み拡大は発生しないようにして
-// いる)。実際の水滴の半径の想定される上限については
-// physics.MaxParticleRadius を参照。
-const DropletBaseDiameter = 64
+// いる)。
+//
+// CreateH2o が生成する直径の実際の最大値は (10+18) * 1.2 = 33.6 CSS px
+// (internal/particle/factory.go の scale() と CreateH2o を参照)。
+// DeviceScaleFactor が最大 3(高密度 Retina 相当)になっても
+// 33.6 * 3 = 100.8 device px までは常に縮小のみで済むよう、余裕を
+// 持って 128px にしている。実際の水滴の半径の想定される上限について
+// は physics.MaxParticleRadius も参照。
+const DropletBaseDiameter = 128
 
 // spriteAAPadding は、グリフをラスタライズする前に、厳密に計測した
 // 寸法の周囲に加える小さな余白(px 単位)である。これにより
@@ -36,7 +54,7 @@ type Sprites struct {
 // ebiten.RunGame が始まる前に呼び出さなければならない(ebiten.NewImage
 // は RunGame 開始前でも使用できる)。
 func NewSprites(faces *FaceCache) *Sprites {
-	bodyFace := faces.Face(BaseFontSize)
+	bodyFace := faces.Face(BaseFontSize * spriteSupersample)
 	return &Sprites{
 		H:       newGlyphSprite(bodyFace, "H"),
 		O:       newGlyphSprite(bodyFace, "O"),
@@ -67,14 +85,17 @@ func newGlyphSprite(face *text.GoTextFace, s string) *ebiten.Image {
 // newH2Sprite は、"H" 本体(BaseFontSize)と "2" の subscript
 // (SubscriptFontSize)を白で合成描画する。NewH2Layout を使って
 // Mizu-ts の SubscriptTextRenderer.ts:31-34 の相対配置を再現しつつ、
-// 粒子位置の基準点を合成画像自身の中心に保つ。
+// 粒子位置の基準点を合成画像自身の中心に保つ。spriteSupersample 倍の
+// フォントサイズで計測・描画するため、NewH2Layout の subOffsetScale
+// にも同じ倍率を渡し、本体に対する subscript の相対位置が供給倍率に
+// よって崩れないようにする。
 func newH2Sprite(faces *FaceCache) *ebiten.Image {
-	bodyFace := faces.Face(BaseFontSize)
-	subFace := faces.Face(SubscriptFontSize)
+	bodyFace := faces.Face(BaseFontSize * spriteSupersample)
+	subFace := faces.Face(SubscriptFontSize * spriteSupersample)
 
 	bodyW, bodyH := text.Measure("H", bodyFace, 0)
 	subW, subH := text.Measure("2", subFace, 0)
-	layout := NewH2Layout(bodyW, bodyH, subW, subH)
+	layout := NewH2Layout(bodyW, bodyH, subW, subH, spriteSupersample)
 
 	img := ebiten.NewImage(int(math.Ceil(layout.CanvasW)), int(math.Ceil(layout.CanvasH)))
 	drawGlyph(img, "H", bodyFace, layout.BodyX, layout.BodyY)

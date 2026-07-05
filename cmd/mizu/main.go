@@ -31,6 +31,12 @@ func main() {
 	measureFlag := flag.Bool("m", false, "enable the measurement overlay (FPS/frame time/particle counts)")
 	flag.Parse()
 
+	// js/wasm ビルドでは、URL クエリ(?h=&o=&m=1)がフラグの値を上書き
+	// する。これは Mizu-ts の src/main.ts:12-21 を反映したものであり、
+	// それ以外の環境では何もしない(params_js.go / params_default.go
+	// を参照)。
+	applyURLParams(hFlag, oFlag, measureFlag)
+
 	// 1. 共有境界。behavior/factory/simulator から読み取られ、
 	// リサイズ時に更新される(porting-plan §5.4)。
 	bounds := core.NewBounds(initialWindowWidth, initialWindowHeight)

@@ -186,6 +186,15 @@ func (m *measuringGame) Draw(screen *ebiten.Image) {
 // Layout は inner.Layout(= render.Game.Layout)にそのまま委譲する。
 // ウィンドウを固定サイズ・リサイズ不可にしているため、outsideWidth/
 // outsideHeight は常に viewportWidth/viewportHeight になる。
+//
+// 重要: render.Game.Layout は HiDPI 対応のため outside(CSS px)に
+// DeviceScaleFactor を掛けた実デバイスピクセルを返す。ここでその
+// 戻り値をそのまま返すことで、Ebitengine が Draw に渡すオフスクリーン
+// (screen)も inner.Layout の戻り値のサイズで確保され、Retina 上でも
+// 描画がはみ出したり切れたりしない。sim.Resize には inner.Layout 内で
+// 従来どおり CSS px(= viewportWidth/viewportHeight)が渡るため、
+// 計測セマンティクス(シナリオの論理解像度・粒子スケール)は変わら
+// ない。
 func (m *measuringGame) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return m.inner.Layout(outsideWidth, outsideHeight)
 }
